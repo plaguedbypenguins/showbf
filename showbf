@@ -76,11 +76,17 @@ def nodes():
         nodes[host]['realMem'] = n['real_memory']
 
         # track disk so can flag low disk
-        nodes[host]['realDisk'] = n['tmp_disk']   # in MB
-        for j in n['gres_used']:
-            k = j.split(':')
-            if k[0] == 'tmp':
-                nodes[host]['allocDisk'] = int(int(k[1])/(1024*1024))   # in MB
+        nodes[host]['allocDisk'] = 0
+        if 'tmp_disk' in n:
+            # have local disks, and slurm is tracking the tmp gres
+            nodes[host]['realDisk'] = n['tmp_disk']   # in MB
+            for j in n['gres_used']:
+                k = j.split(':')
+                if k[0] == 'tmp':
+                    nodes[host]['allocDisk'] = int(int(k[1])/(1024*1024))   # in MB
+        else:
+            # don't have local disks on nodes?
+            nodes[host]['realDisk'] = 99999999999   # make it something large
 
         nodes[host]['nGpus'] = 0
         for gres in n['gres']:
