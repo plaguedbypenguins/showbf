@@ -1108,8 +1108,11 @@ if __name__ == '__main__':
             for k in ppp:
                 print(k + (cw['queue']-len(k)+colGap)*' ', end='')
                 for i in cols:
-                    for j in [ 'a', 'i', 'o', 'b', 't' ]:
-                        print('{num:{field_size}d}'.format(num=u[k][i][j], field_size=(cw[i])), end='')
+                    if 'gpu' not in k and i == 'gpus':
+                        print(' '*(colGap+int(cw[i]/2)) + '-', end='')
+                    else:
+                        for j in [ 'a', 'i', 'o', 'b', 't' ]:
+                            print('{num:{field_size}d}'.format(num=u[k][i][j], field_size=(cw[i])), end='')
                     if i != cols[-1]:
                         print(' '*colGap, end='')
                 print()
