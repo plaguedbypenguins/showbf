@@ -809,12 +809,13 @@ def printFreeBins(b, n, lmp, ldp, printNodes=0, prefix=' '):
     #print(cores)
 
     # compact output in the default view
-    if printNodes == 0 and len(cores) > 10:
+    if printNodes == -1:  # -f forces full list
+        printNodes = 0
+    elif printNodes == 0 and len(cores) > 10:
         c = cores[:6]
         c.append('...')
         c.extend(cores[-2:])
         cores=c
-        #print(cores)
 
     for i in cores:
         if i == '...':
@@ -901,7 +902,7 @@ def usage(n):
         print(" -s    Displayed in a format similar to 'sinfo -s'")
         print(" -h    this help")
     elif n == 'showbf':
-        print("Usage: showbf [-h] [-v|-vv]")
+        print("Usage: showbf [-h] [-f|-v|-vv]")
         print("   Show backfill information for each queue/partition.")
         print()
         print("   Jobs submitted with resource requests less than these backfill")
@@ -914,13 +915,15 @@ def usage(n):
         print("   This script includes some knowledge of resources constrainted due to")
         print("   queue partitioning, socket affinity, ram, etc. so is mostly accurate.")
         print("")
-        print(" -v    more verbose and detailed output")
-        print(" -vv   even more verbose and detailed output")
-        print(" -h    this help")
+        print(" -f    full display of backfill slots")
+        print("       the default is to try to fit in a reasonable number of lines.")
+        print(" -v    show verbose output including node lists.")
+        print(" -vv   even more verbose output.")
+        print(" -h    this help.")
     elif n == 'spart':
         print("Usage: spart [-h] [-n]")
         print("   Show usage and backfill information for each queue/partition.")
-        print(" -n    do not combine milan and milan-c into one parition")
+        print(" -n    do not combine milan and milan-c into one partition")
         print(" -h    this help")
     else:
         print('no help available')
@@ -933,7 +936,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         if sys.argv[1] in [ '-h', '--help', '-help' ]:
            usage(n)
-        elif n == 'showbf' and ( sys.argv[1] != '-v' and sys.argv[1] != '-vv' ):
+        elif n == 'showbf' and ( sys.argv[1] != '-v' and sys.argv[1] != '-vv' and sys.argv[1] != '-f'):
             usage(n)
         elif n == 'qinfo' and ( sys.argv[1] != '-s' and sys.argv[1] != '-v' ):
             usage(n)
@@ -1129,7 +1132,9 @@ if __name__ == '__main__':
 
     elif n == 'showbf':
         printNodes=0
-        if len(sys.argv) > 1 and sys.argv[1] == '-v':
+        if len(sys.argv) > 1 and sys.argv[1] == '-f':
+            printNodes=-1
+        elif len(sys.argv) > 1 and sys.argv[1] == '-v':
             printNodes=1
         elif len(sys.argv) > 1 and sys.argv[1] == '-vv':
             printNodes=2
