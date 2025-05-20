@@ -797,12 +797,15 @@ def toCexec(c):
 def printFreeBins(b, n, lmp, ldp, printNodes=0, prefix=' '):
     cores = sorted(b.bins(), reverse=True)
     #print(cores)
-    if len(cores) > 10:
+
+    # compact output in the default view
+    if printNodes == 0 and len(cores) > 10:
         c = cores[:6]
         c.append('...')
         c.extend(cores[-2:])
         cores=c
         #print(cores)
+
     for i in cores:
         if i == '...':
             print(' '*20, '...')
