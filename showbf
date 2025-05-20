@@ -52,6 +52,10 @@ partitionLowDisk = {'skylake':3000, 'skylake-gpu':3000, 'sstar':3000, 'gstar':30
 # max allowed walltime in seconds. eg. MaxTime=168:00:00
 TMAX = 24*7*3600
 
+# NOTE: the order that partitions are printed in is also a configurable and is lower in the code in ppp, cpu_ppp.
+# as are various other overlapping partition hacks.
+# the real world is messy... get over it.
+
 debug = 0
 
 def nodes():
@@ -942,6 +946,12 @@ if __name__ == '__main__':
     #print('bcu')
     #for i in bcu.keys():
     #    print(i, bcu[i].data)
+
+
+    # output will be printed in the order of the fields in ppp, cpu_ppp.
+    # ie. pretty print partition, and cpu pretty print partition
+    #
+    # Note: gpu partitions are assumed to have 'gpu' in the partition name
 
     if n == 'spart' and len(sys.argv) > 1 and sys.argv[1] == '-n':
         # do not combine milan and milan-c
