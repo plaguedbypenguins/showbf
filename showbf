@@ -3,25 +3,53 @@
 # (c) Robin Humble. Wed Sep 25 18:58:22 AEST 2019
 # licensed under the GPLv3
 
+# showbf
+#  - find slurm back-fill windows
+#  - modeled after the maui/moab tool of the same name
+#
+# this works by using pyslurm to find at all jobs, reservations, nodes, and try
+# to figure out what slurm has planned for the future, and hence what backfill
+# gaps and windows remain for us to use 'now'.
+#
+# this is actually pretty easy. printing nicely and overlapping cpu and gpu
+# partitions are where most of the complexity is.
+#
+#  this code can also be run as 'qinfo' and 'spart'
+#  - qinfo shows overall queue/partition information
+#  - spart is a kinda a combined qinfo and showbf
+#
+# each of the 3 modes of operation has various command line flags.
+# see -h in each mode
+
 import pyslurm
 import sys
 import time
 import datetime
 import math
 
-# partitions are complex with gpus...
+# configure the below for your cluster
+
+# our partitions ->
 # skylake-gpu is essentially >= 4 cores + 2 gpus on every 36 core skylake node (except for j110), leaving <= 32 cores for cpu jobs.
 # milan is 64 core dave nodes. milan-c is <= 48 cores on each 64 core gina node. milan-gpu is >= 16 cores + 4 gpus on each gina node.
 #   ie. milan-c/milan-gpu are essentially the same as skylake/skylake-gpu
 #   the cpu component of the milan cluster is milan+milan-c partitions, and is combined and printed as 'milan'
-PARTITIONS = {'skylake-gpu':['john', 'bryan'], 'skylake':['john', 'bryan'], 'sstar':['sstar'], 'gstar':['gstar'], 'milan':['dave'], 'milan-c':['gina'], 'milan-gpu':['gina'], 'trevor':['trevor']}
+
+# partitions and their node name prefixes
+#  eg. skylake partition contains john[1-100],bryan[1-8] nodes
+# partitions may overlap
+partitions = {'skylake-gpu':['john', 'bryan'], 'skylake':['john', 'bryan'], 'sstar':['sstar'], 'gstar':['gstar'], 'milan':['dave'], 'milan-c':['gina'], 'milan-gpu':['gina'], 'trevor':['trevor']}
+# lower limit of the cores reserved for GPU jobs in each partition
 partitionResGpuCores = {'skylake':4, 'skylake-gpu':4, 'sstar':0, 'gstar':0, 'milan':0, 'milan-c':16, 'milan-gpu':16, 'trevor':0}
+# max cores usable by CPU jobs in each partitons. by eg. MaxCPUsPerNode=48 or similar
 partitionMaxCpuCores = {'skylake':[32], 'skylake-gpu':[4], 'sstar':[32,16], 'gstar':[32,12], 'milan':[64], 'milan-c':[48], 'milan-gpu':[16], 'trevor':[12]}
+# SMT/hyperthread threads per core. 1 means SMT is off. can be 2 for many chips, or 4 for KNL.
 partitionThreadsPerCore = {'skylake':1, 'skylake-gpu':1, 'sstar':1, 'gstar':1, 'milan':1, 'milan-c':1, 'milan-gpu':1, 'trevor':1}
-# arbitrary thresholds for what constitutes a low mem/core or low disk/core situation
-partitionLowMem  = {'skylake':1000, 'skylake-gpu':1000, 'sstar':1000, 'gstar':1000, 'milan':1000, 'milan-c':1000, 'milan-gpu':1000, 'trevor':500}  # MB per core
+# arbitrary thresholds for what constitutes a low mem/core or low disk/core situation in MB
+partitionLowMem  = {'skylake':1000, 'skylake-gpu':1000, 'sstar':1000, 'gstar':1000, 'milan':1000, 'milan-c':1000, 'milan-gpu':1000, 'trevor':500}   # MB per core
 partitionLowDisk = {'skylake':3000, 'skylake-gpu':3000, 'sstar':3000, 'gstar':3000, 'milan':3000, 'milan-c':3000, 'milan-gpu':3000, 'trevor':3000}  #  ""
-# max allowed walltime
+
+# max allowed walltime in seconds. eg. MaxTime=168:00:00
 TMAX = 24*7*3600
 
 debug = 0
@@ -353,6 +381,11 @@ def minFutureJobTime(node, jobs, hn, res):
     return st
 
 def get_core_usage(data):
+    """
+      returns
+          u == usage by partition
+        bcu == binned core (and gpu) usage for each partion
+    """
     # split gpu cores from cpu cores
     for id, job in data['jobs'].items():
         if job['state'] == 'RUNNING':
@@ -387,7 +420,7 @@ def get_core_usage(data):
     # bins of cores free
     bcu = {}
     u = {}
-    for part, prefixes in PARTITIONS.items():
+    for part, prefixes in partitions.items():
         # running/alloc, idle/avail, offline, blocked/unschedulable/inaccessible, total - for cores and nodes and gpus
         usage = { 'cores':{'a':0, 'i': 0, 'o': 0, 'b':0, 't':0},
                   'nodes':{'a':0, 'i': 0, 'o': 0, 'b':0, 't':0},
@@ -887,6 +920,7 @@ if __name__ == '__main__':
     #print('jobs', data['jobs'].keys(), 'len', len(data['jobs'].keys()))
     #print('nodes', data['nodes'].keys(), 'len', len(data['nodes'].keys()))
 
+    # find usage, and bcu (binned core usage) for each partition
     u, bcu = get_core_usage(data)
     #print('u', u)
     #print('bcu')
