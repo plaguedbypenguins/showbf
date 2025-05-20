@@ -891,7 +891,7 @@ def usage(n):
         print(" -s    Displayed in a format similar to 'sinfo -s'")
         print(" -h    this help")
     elif n == 'showbf':
-        print("Usage: " + n)
+        print("Usage: showbf [-h] [-v|-vv]")
         print("   Show backfill information for each queue/partition.")
         print()
         print("   Jobs submitted with resource requests less than these backfill")
@@ -903,6 +903,15 @@ def usage(n):
         print()
         print("   This script includes some knowledge of resources constrainted due to")
         print("   queue partitioning, socket affinity, ram, etc. so is mostly accurate.")
+        print("")
+        print(" -v    more verbose and detailed output")
+        print(" -vv   even more verbose and detailed output")
+        print(" -h    this help")
+    elif n == 'spart':
+        print("Usage: spart [-h] [-n]")
+        print("   Show usage and backfill information for each queue/partition.")
+        print(" -n    do not combine milan and milan-c into one parition")
+        print(" -h    this help")
     else:
         print('no help available')
     sys.exit(0)
@@ -917,6 +926,8 @@ if __name__ == '__main__':
         elif n == 'showbf' and ( sys.argv[1] != '-v' and sys.argv[1] != '-vv' ):
             usage(n)
         elif n == 'qinfo' and ( sys.argv[1] != '-s' and sys.argv[1] != '-v' ):
+            usage(n)
+        elif n == 'spart' and ( sys.argv[1] != '-n' ):
             usage(n)
 
     # Get all data
