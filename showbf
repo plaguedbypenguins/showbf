@@ -43,8 +43,8 @@ partitions = {'skylake-gpu':['john', 'bryan'], 'skylake':['john', 'bryan'], 'sst
 partitionResGpuCores = {'skylake':4, 'skylake-gpu':4, 'sstar':0, 'gstar':0, 'milan':0, 'milan-c':16, 'milan-gpu':16, 'trevor':0}
 # max cores usable by CPU jobs in each partitons. by eg. MaxCPUsPerNode=48 or similar
 partitionMaxCpuCores = {'skylake':[32], 'skylake-gpu':[4], 'sstar':[32,16], 'gstar':[32,12], 'milan':[64], 'milan-c':[48], 'milan-gpu':[16], 'trevor':[12]}
-# SMT/hyperthread threads per core. 1 means SMT is off. can be 2 for many chips, or 4 for KNL.
-partitionThreadsPerCore = {'skylake':1, 'skylake-gpu':1, 'sstar':1, 'gstar':1, 'milan':1, 'milan-c':1, 'milan-gpu':1, 'trevor':1}
+# SMT/hyperthread threads per core. if not specified, then 1 is the default and means SMT/HT is off. can be 2 for many chips, or 4 for KNL.
+partitionThreadsPerCore = {}
 # arbitrary thresholds for what constitutes a low mem/core or low disk/core situation in MB
 partitionLowMem  = {'skylake':1000, 'skylake-gpu':1000, 'sstar':1000, 'gstar':1000, 'milan':1000, 'milan-c':1000, 'milan-gpu':1000, 'trevor':500}   # MB per core
 partitionLowDisk = {'skylake':3000, 'skylake-gpu':3000, 'sstar':3000, 'gstar':3000, 'milan':3000, 'milan-c':3000, 'milan-gpu':3000, 'trevor':3000}  #  ""
@@ -437,7 +437,9 @@ def get_core_usage(data):
 
                     # which type of cores we are considering
                     ty = 'nCpuCores'
-                    tpc = partitionThreadsPerCore[part]
+                    tpc = 1
+                    if part in partitionThreadsPerCore.keys():
+                        tpc = partitionThreadsPerCore[part]
                     if 'gpu' in part:
                         ty = 'nGpuCores'
                         tpc = 1
