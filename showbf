@@ -7,19 +7,20 @@
 #  - find slurm back-fill windows
 #  - modeled after the maui/moab tool of the same name
 #
-# this works by using pyslurm to find at all jobs, reservations, nodes, and try
-# to figure out what slurm has planned for the future, and hence what backfill
-# gaps and windows remain for us to use 'now'.
+# use pyslurm to look at all slurm jobs, reservations, and nodes, to see what
+# slurm is using now (cores, gpus, mem, tmp disk) and what it has tentatively
+# scheduled for the future.
+# this tells us what (cores, mem, tmp) backfill windows remain for us to use 'now'.
 #
-# this is actually pretty easy. printing nicely and overlapping cpu and gpu
-# partitions are where most of the complexity is.
+# we don't attempt to find backfill windows for gpu jobs.
 #
 #  this code can also be run as 'qinfo' and 'spart'
-#  - qinfo shows overall queue/partition information
+#  - qinfo shows overall queue/partition resource availability, as well as
+#      offline or blocked cores/nodes etc.
 #  - spart is a kinda a combined qinfo and showbf
 #
 # each of the 3 modes of operation has various command line flags.
-# see -h in each mode
+# see -h in each mode for details.
 
 import pyslurm
 import sys
@@ -27,7 +28,9 @@ import time
 import datetime
 import math
 
-# configure the below for your cluster
+# NOTE: gpu partitions are assumed to have 'gpu' in their name
+
+# NOTE: only partitions in ppp, cpu_ppp will be printed
 
 # our partitions ->
 # skylake-gpu is essentially >= 4 cores + 2 gpus on every 36 core skylake node (except for j110), leaving <= 32 cores for cpu jobs.
@@ -36,25 +39,36 @@ import math
 #   the cpu component of the milan cluster is milan+milan-c partitions, and is combined and printed as 'milan'
 
 # partitions and their node name prefixes
-#  eg. skylake partition contains john[1-100],bryan[1-8] nodes
-# partitions may overlap
+#  eg. a skylake partition could contain john[1-100],bryan[1-8] nodes and would be 'skylake':['john','bryan']
+#  partitions may overlap. eg. milan-c and milan-gpu overlap on the same nodes.
 partitions = {'skylake-gpu':['john', 'bryan'], 'skylake':['john', 'bryan'], 'sstar':['sstar'], 'gstar':['gstar'], 'milan':['dave'], 'milan-c':['gina'], 'milan-gpu':['gina'], 'trevor':['trevor']}
-# lower limit of the cores reserved for GPU jobs in each partition
+
+# lower limit of the cores reserved for GPU jobs in each partition. cpu-only partitions are 0
 partitionResGpuCores = {'skylake':4, 'skylake-gpu':4, 'sstar':0, 'gstar':0, 'milan':0, 'milan-c':16, 'milan-gpu':16, 'trevor':0}
-# max cores usable by CPU jobs in each partitons. by eg. MaxCPUsPerNode=48 or similar
+
+# max cores usable by CPU jobs in each partitions. usually just the number of real cores.
+# but can be limited by eg. MaxCPUsPerNode=48 or similar.
+# different generations of nodes can have different numbers of cores within one partition
 partitionMaxCpuCores = {'skylake':[32], 'skylake-gpu':[4], 'sstar':[32,16], 'gstar':[32,12], 'milan':[64], 'milan-c':[48], 'milan-gpu':[16], 'trevor':[12]}
+
 # SMT/hyperthread threads per core. if not specified, then 1 is the default and means SMT/HT is off. can be 2 for many chips, or 4 for KNL.
 partitionThreadsPerCore = {}
-# arbitrary thresholds for what constitutes a low mem/core or low disk/core situation in MB
+
+# arbitrary thresholds for what constitutes a low mem per core, or low local disk per core situation. in MB
 partitionLowMem  = {'skylake':1000, 'skylake-gpu':1000, 'sstar':1000, 'gstar':1000, 'milan':1000, 'milan-c':1000, 'milan-gpu':1000, 'trevor':500}   # MB per core
 partitionLowDisk = {'skylake':3000, 'skylake-gpu':3000, 'sstar':3000, 'gstar':3000, 'milan':3000, 'milan-c':3000, 'milan-gpu':3000, 'trevor':3000}  #  ""
 
-# max allowed walltime in seconds. eg. MaxTime=168:00:00
-TMAX = 24*7*3600
+# compact version of node names. used for the nodes lists in verbose views
+compactPrefixes = {'bryan':'b', 'gina':'g', 'john':'j', 'sstar':'ss', 'gstar':'gs', 'dave':'d', 'trevor':'t'}
 
-# NOTE: the order that partitions are printed in is also a configurable and is lower in the code in ppp, cpu_ppp.
-# as are various other overlapping partition hacks.
-# the real world is messy... get over it.
+# output will be printed in the order of the fields in ppp, cpu_ppp. aka 'pretty print partitions'
+# ppp is used by qinfo and spart and includes gpu partitions
+ppp = [ "skylake", "skylake-gpu", "milan", "milan-gpu", "trevor" ]
+# cpu_ppp is cpu-only partitions. used for showbf
+cpu_ppp = [ "skylake", "milan", "trevor" ]
+
+# max allowed walltime for jobs. in seconds. eg. MaxTime=168:00:00
+TMAX = 24*7*3600
 
 debug = 0
 
@@ -795,11 +809,10 @@ def compact(l):
    return c
 
 def toCexec(c):
-   mp = {'bryan':'b', 'gina':'g', 'john':'j', 'sstar':'ss', 'gstar':'gs', 'dave':'d', 'trevor':'t'}
    cc = ''
    for i in c.keys():
-      if i in mp.keys():
-         cc += mp[i] + ':'
+      if i in compactPrefixes.keys():
+         cc += compactPrefixes[i] + ':'
       cc += compressList(c[i])
       cc += ' '
    return cc
@@ -956,33 +969,25 @@ if __name__ == '__main__':
     #for i in bcu.keys():
     #    print(i, bcu[i].data)
 
+    # HACK HACK HACK
+    # handle milan/milan-c/milan-gpu overlapping
+    if 'milan' in ppp:
+        # override ppp, cpu_ppp in spart -n mode in order to show milan-c separately from milan
+        if n == 'spart' and len(sys.argv) > 1 and sys.argv[1] == '-n':
+            # do not combine milan and milan-c
+                ppp = [ "skylake", "skylake-gpu", "milan", "milan-c", "milan-gpu", "trevor" ]
+                cpu_ppp = [ "skylake", "milan", "milan-c", "trevor" ]
 
-    # output will be printed in the order of the fields in ppp, cpu_ppp.
-    # ie. pretty print partition, and cpu pretty print partition
-    #
-    # Note: gpu partitions are assumed to have 'gpu' in the partition name
-
-    if n == 'spart' and len(sys.argv) > 1 and sys.argv[1] == '-n':
-        # do not combine milan and milan-c
-        ppp = [ "skylake", "skylake-gpu", "milan", "milan-c", "milan-gpu", "trevor" ]
-        cpu_ppp = [ "skylake", "milan", "milan-c", "trevor" ]
-    else:
-        # combine milan and milan-c into just milan
-        ppp = [ "skylake", "skylake-gpu", "milan", "milan-gpu", "trevor" ]
-        cpu_ppp = [ "skylake", "milan", "trevor" ]
-        # usage
-        for i in ['nodes', 'cores', 'gpus']:
-            for j in [ 'a', 'i', 'o', 'b', 't' ]:
-                u['milan'][i][j] += u['milan-c'][i][j]
-        del u['milan-c']
-        # bins
-        bcu['milan'].extend(bcu['milan-c'])
-        del bcu['milan-c']
-
-        #print('u', u)
-        #print('bcu')
-        #for i in bcu.keys():
-        #    print(i, bcu[i].data)
+        # by default, combine milan and milan-c (the cpu components of the cluster) into just milan
+        if 'milan-c' not in ppp:
+            # usage
+            for i in ['nodes', 'cores', 'gpus']:
+                for j in [ 'a', 'i', 'o', 'b', 't' ]:
+                    u['milan'][i][j] += u['milan-c'][i][j]
+            del u['milan-c']
+            # bins
+            bcu['milan'].extend(bcu['milan-c'])
+            del bcu['milan-c']
 
     if n == 'spart':
         for k in ppp:
@@ -1103,8 +1108,11 @@ if __name__ == '__main__':
             for k in ppp:
                 print(k + (cw['queue']-len(k)+colGap)*' ', end='')
                 for i in cols:
-                    for j in [ 'a', 'i', 'o', 'b', 't' ]:
-                        print('{num:{field_size}d}'.format(num=u[k][i][j], field_size=(cw[i])), end='')
+                    if 'gpu' not in k and i == 'gpus':
+                        print(' '*(colGap+int(cw[i]/2)) + '-', end='')
+                    else:
+                        for j in [ 'a', 'i', 'o', 'b', 't' ]:
+                            print('{num:{field_size}d}'.format(num=u[k][i][j], field_size=(cw[i])), end='')
                     if i != cols[-1]:
                         print(' '*colGap, end='')
                 print()
