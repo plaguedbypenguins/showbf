@@ -720,7 +720,7 @@ def usage(n):
         print("   (allow ~5 mins for scheduling).")
         print()
         print("   This script includes some knowledge of resources constrainted due to")
-        print("   queue partitioning, socket affinity, ram, etc. so is mostly accurate.")
+        print("   queue partitioning, ram, local disk (tmp), etc. so is mostly accurate.")
         print("")
         print(" -f    full display of backfill slots")
         print("       the default is to try to fit in a reasonable number of lines.")
