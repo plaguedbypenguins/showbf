@@ -781,7 +781,7 @@ if __name__ == '__main__':
                 printVerbose(u[k], gpus="nope")
             elif 'gpu' in k:
                 print('%12s' % k, 'idle gpus', u[k]['gpus']['i'], 'used', str(int(perc['gpus'])) + '%',
-                         '(idle cores %d%% idle nodes %d%%)' % ( int(perc['cores']), int(perc['nodes']) ))
+                         '(used cores %d%% nodes %d%%)' % ( int(perc['cores']), int(perc['nodes']) ))
                 printVerbose(u[k], gpus='first')
             else:
                 print('%12s' % k, 'idle cores', u[k]['cores']['i'], 'used', str(int(perc['cores'])) + '%,',
